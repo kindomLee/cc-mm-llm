@@ -103,7 +103,9 @@ def _get_api_key() -> str:
 
 # ── Project context injection (opt-in) ────────────────────────────
 
+_CONTEXT_TOTAL_BUDGET = 8000
 _CONTEXT_MAX_CHARS = 4000
+_SKILL_MAX_CHARS = 2000
 _TREE_MAX_LINES = 200
 _TREE_SKIP_DIRS = {
     ".git", "node_modules", "__pycache__", ".venv", "venv",
@@ -141,6 +143,18 @@ def _collect_project_context() -> str:
         except OSError:
             pass
 
+    # Read .claude/skills/*.md
+    skills_dir = root_path / ".claude" / "skills"
+    if skills_dir.is_dir():
+        for f in sorted(skills_dir.glob("*.md")):
+            try:
+                text = f.read_text(encoding="utf-8", errors="replace")
+                if len(text) > _SKILL_MAX_CHARS:
+                    text = text[:_SKILL_MAX_CHARS] + "\n... [truncated]"
+                parts.append(f"## Skill: {f.name}\n{text}")
+            except OSError:
+                pass
+
     # Generate directory tree (depth <= 3)
     try:
         result = subprocess.run(
@@ -167,7 +181,10 @@ def _collect_project_context() -> str:
     except (OSError, subprocess.TimeoutExpired):
         pass
 
-    _project_context_cache = "\n\n".join(parts)
+    combined = "\n\n".join(parts)
+    if len(combined) > _CONTEXT_TOTAL_BUDGET:
+        combined = combined[:_CONTEXT_TOTAL_BUDGET] + "\n... [context truncated at budget]"
+    _project_context_cache = combined
     return _project_context_cache
 
 
@@ -312,9 +329,22 @@ async def review_code(
 MAX_FILE_CHARS = 60_000  # ~15K tokens
 
 
+def _check_path_allowed(p: Path) -> None:
+    """Raise ValueError if *p* is outside the allowed project root."""
+    root = os.environ.get("LLM_PROJECT_ROOT", "")
+    if not root:
+        return  # no restriction when project root is unset
+    root_path = Path(root).expanduser().resolve()
+    if not p.is_relative_to(root_path):
+        raise ValueError(
+            f"Access denied: {p} is outside project root {root_path}"
+        )
+
+
 def _read_file(path: str) -> str:
     """Read a file, truncate if too large."""
     p = Path(path).expanduser().resolve()
+    _check_path_allowed(p)
     if not p.is_file():
         raise FileNotFoundError(f"File not found: {p}")
     text = p.read_text(encoding="utf-8", errors="replace")
@@ -330,7 +360,7 @@ def _read_files(paths: list[str]) -> str:
         try:
             content = _read_file(path)
             parts.append(f"### {path}\n```\n{content}\n```")
-        except FileNotFoundError as e:
+        except (FileNotFoundError, ValueError) as e:
             parts.append(f"### {path}\n[ERROR: {e}]")
     return "\n\n".join(parts)
 

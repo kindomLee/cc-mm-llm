@@ -225,6 +225,81 @@ class TestProjectContext:
             result = server._collect_project_context()
             assert "truncated" in result
 
+    def test_skills_collected(self, tmp_path: Path):
+        skills_dir = tmp_path / ".claude" / "skills"
+        skills_dir.mkdir(parents=True)
+        (skills_dir / "lint.md").write_text("Always use ruff.")
+        (skills_dir / "test.md").write_text("Use pytest with AAA pattern.")
+
+        with patch.dict(os.environ, {"LLM_PROJECT_ROOT": str(tmp_path)}):
+            result = server._collect_project_context()
+            assert "Skill: lint.md" in result
+            assert "Always use ruff" in result
+            assert "Skill: test.md" in result
+
+    def test_total_budget_truncation(self, tmp_path: Path):
+        # CLAUDE.md is capped at _CONTEXT_MAX_CHARS, so use skills to exceed budget
+        claude_md = tmp_path / "CLAUDE.md"
+        claude_md.write_text("C" * server._CONTEXT_MAX_CHARS)
+        skills_dir = tmp_path / ".claude" / "skills"
+        skills_dir.mkdir(parents=True)
+        # Each skill up to _SKILL_MAX_CHARS; create enough to blow past budget
+        for i in range(5):
+            (skills_dir / f"s{i}.md").write_text("S" * server._SKILL_MAX_CHARS)
+
+        with patch.dict(os.environ, {"LLM_PROJECT_ROOT": str(tmp_path)}):
+            result = server._collect_project_context()
+            assert "context truncated at budget" in result
+            assert len(result) <= server._CONTEXT_TOTAL_BUDGET + 100
+
+
+# ── TestFileAccessRestriction ────────────────────────────────────
+
+
+class TestFileAccessRestriction:
+    def test_no_root_allows_any_path(self, tmp_path: Path):
+        f = tmp_path / "allowed.txt"
+        f.write_text("ok")
+        with patch.dict(os.environ, {}, clear=True):
+            os.environ.pop("LLM_PROJECT_ROOT", None)
+            result = server._read_file(str(f))
+            assert result == "ok"
+
+    def test_within_root_allowed(self, tmp_path: Path):
+        f = tmp_path / "project" / "src.py"
+        f.parent.mkdir()
+        f.write_text("code")
+        with patch.dict(os.environ, {"LLM_PROJECT_ROOT": str(tmp_path)}):
+            result = server._read_file(str(f))
+            assert result == "code"
+
+    def test_outside_root_denied(self, tmp_path: Path):
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        secret = outside / "secret.txt"
+        secret.write_text("sensitive")
+
+        project = tmp_path / "project"
+        project.mkdir()
+
+        with patch.dict(os.environ, {"LLM_PROJECT_ROOT": str(project)}):
+            with pytest.raises(ValueError, match="Access denied"):
+                server._read_file(str(secret))
+
+    def test_read_files_catches_access_denied(self, tmp_path: Path):
+        project = tmp_path / "project"
+        project.mkdir()
+        (project / "a.py").write_text("a")
+
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "b.py").write_text("b")
+
+        with patch.dict(os.environ, {"LLM_PROJECT_ROOT": str(project)}):
+            # _read_files should catch ValueError and include error in output
+            result = server._read_files([str(outside / "b.py")])
+            assert "Access denied" in result
+
 
 # ── TestCallLlm ──────────────────────────────────────────────────
 
