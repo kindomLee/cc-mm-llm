@@ -26,13 +26,23 @@ Any provider exposing an OpenAI-compatible `/chat/completions`-style endpoint wo
 - Python 3.11+
 - A Claude Code installation
 
+### Set your API key
+
+Add `LLM_API_KEY` to your shell profile so it stays out of config files:
+
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export LLM_API_KEY=your-api-key
+```
+
+> **Security note:** Avoid passing the key via `-e LLM_API_KEY=...` in `claude mcp add` — that writes it in plaintext to `~/.claude/settings.json`, which may be committed to dotfiles repos or visible to other processes. The server inherits `LLM_API_KEY` from the environment automatically.
+
 ### Option A: One-liner (no clone needed)
 
 `server.py` includes [PEP 723](https://peps.python.org/pep-0723/) inline script metadata, so `uv` resolves dependencies automatically:
 
 ```bash
 claude mcp add llm-mcp \
-  -e LLM_API_KEY=your-api-key \
   -- uv run https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py
 ```
 
@@ -40,7 +50,6 @@ To customize the provider (e.g. DeepSeek):
 
 ```bash
 claude mcp add llm-mcp \
-  -e LLM_API_KEY=your-api-key \
   -e LLM_API_URL=https://api.deepseek.com/chat/completions \
   -e LLM_MODEL=deepseek-chat \
   -- uv run https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py
@@ -52,7 +61,6 @@ claude mcp add llm-mcp \
 git clone https://github.com/kindomLee/cc-mm-llm.git ~/.claude/mcp-servers/llm-mcp
 
 claude mcp add llm-mcp \
-  -e LLM_API_KEY=your-api-key \
   -- uv run ~/.claude/mcp-servers/llm-mcp/server.py
 ```
 
@@ -69,14 +77,13 @@ Add to `~/.claude/settings.json`:
       "args": [
         "run",
         "https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py"
-      ],
-      "env": {
-        "LLM_API_KEY": "your-api-key"
-      }
+      ]
     }
   }
 }
 ```
+
+> `LLM_API_KEY` is inherited from the shell environment. If you must set it per-server, use the `"env"` block — but be aware the key will be stored in plaintext.
 
 ## Environment Variables
 
