@@ -22,21 +22,43 @@ Any provider exposing an OpenAI-compatible `/chat/completions`-style endpoint wo
 
 ### Prerequisites
 
+- [uv](https://docs.astral.sh/uv/) (recommended)
 - Python 3.11+
-- [uv](https://docs.astral.sh/uv/) (recommended) or pip
 - A Claude Code installation
 
-### Add to Claude Code
+### Option A: One-liner (no clone needed)
+
+`server.py` includes [PEP 723](https://peps.python.org/pep-0723/) inline script metadata, so `uv` resolves dependencies automatically:
 
 ```bash
 claude mcp add llm-mcp \
   -e LLM_API_KEY=your-api-key \
-  -e LLM_API_URL=https://api.minimax.io/v1/text/chatcompletion_v2 \
-  -e LLM_MODEL=MiniMax-M2.5 \
-  -- uv run --with 'mcp[cli]' --with httpx python /path/to/server.py
+  -- uv run https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py
 ```
 
-Or add manually to `~/.claude/settings.json`:
+To customize the provider (e.g. DeepSeek):
+
+```bash
+claude mcp add llm-mcp \
+  -e LLM_API_KEY=your-api-key \
+  -e LLM_API_URL=https://api.deepseek.com/chat/completions \
+  -e LLM_MODEL=deepseek-chat \
+  -- uv run https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py
+```
+
+### Option B: Clone locally
+
+```bash
+git clone https://github.com/kindomLee/cc-mm-llm.git ~/.claude/mcp-servers/llm-mcp
+
+claude mcp add llm-mcp \
+  -e LLM_API_KEY=your-api-key \
+  -- uv run ~/.claude/mcp-servers/llm-mcp/server.py
+```
+
+### Option C: Manual config
+
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -45,13 +67,11 @@ Or add manually to `~/.claude/settings.json`:
       "type": "stdio",
       "command": "uv",
       "args": [
-        "run", "--with", "mcp[cli]", "--with", "httpx",
-        "python", "/path/to/server.py"
+        "run",
+        "https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py"
       ],
       "env": {
-        "LLM_API_KEY": "your-api-key",
-        "LLM_API_URL": "https://api.minimax.io/v1/text/chatcompletion_v2",
-        "LLM_MODEL": "MiniMax-M2.5"
+        "LLM_API_KEY": "your-api-key"
       }
     }
   }
@@ -109,7 +129,7 @@ This gives the LLM awareness of your project structure and conventions without m
 ## Running Tests
 
 ```bash
-cd /path/to/cc-mm-llm
+git clone https://github.com/kindomLee/cc-mm-llm.git && cd cc-mm-llm
 uv run --with 'mcp[cli]' --with httpx --with pytest --with pytest-asyncio \
     pytest test_server.py -v
 ```

@@ -1,11 +1,21 @@
+# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "mcp[cli]",
+#     "httpx",
+# ]
+# ///
 """Generic LLM MCP Server — multi-instance parallel tasks, debate, code review, analysis.
 
 A generic MCP server for Claude Code that drives any OpenAI-compatible LLM API.
 Supports parallel tasks, cross-model debate, multi-perspective analysis,
 and file-aware code review / patch generation.
 
-Usage:
-    uv run --with 'mcp[cli]' --with httpx python server.py
+Usage (local):
+    uv run server.py
+
+Usage (remote, no clone needed):
+    uv run https://raw.githubusercontent.com/kindomLee/cc-mm-llm/main/server.py
 
 Environment:
     LLM_API_KEY:            API key / Bearer token (required)
