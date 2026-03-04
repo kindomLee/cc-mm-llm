@@ -264,10 +264,21 @@ def _format_reply(response: dict[str, Any], label: str = "") -> str:
     usage = response.get("usage", {})
     model = response.get("model", "unknown")
     prefix = f"**[{label}]**\n\n" if label else ""
+
+    # Build token stats
+    prompt_tok = usage.get("prompt_tokens", "?")
+    completion_tok = usage.get("completion_tokens", "?")
+    token_parts = [f"{prompt_tok} in / {completion_tok} out"]
+
+    # Show reasoning tokens if present (e.g. MiniMax M2.5, OpenAI o1/o3)
+    details = usage.get("completion_tokens_details", {})
+    reasoning_tok = details.get("reasoning_tokens") if isinstance(details, dict) else None
+    if reasoning_tok is not None:
+        token_parts.append(f"{reasoning_tok} reasoning")
+
     footer = (
         f"\n\n---\n_Model: {model} | "
-        f"Tokens: {usage.get('prompt_tokens', '?')} in / "
-        f"{usage.get('completion_tokens', '?')} out_"
+        f"Tokens: {' / '.join(token_parts)}_"
     )
     return prefix + content + footer
 

@@ -169,6 +169,25 @@ class TestFormatReply:
         result = server._format_reply(fake_response, label="Test Label")
         assert "**[Test Label]**" in result
 
+    def test_reasoning_tokens_shown(self):
+        resp = {
+            "choices": [{"message": {"content": "answer"}}],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 50,
+                "completion_tokens_details": {"reasoning_tokens": 40},
+            },
+            "model": "test-model",
+        }
+        result = server._format_reply(resp)
+        assert "40 reasoning" in result
+        assert "10 in" in result
+        assert "50 out" in result
+
+    def test_no_reasoning_tokens_when_absent(self, fake_response: dict):
+        result = server._format_reply(fake_response)
+        assert "reasoning" not in result
+
 
 # ── TestProjectContext ────────────────────────────────────────────
 
